@@ -16,7 +16,7 @@ export function hourKey(at) {
   return new Date(Math.floor(new Date(at).getTime() / 3600000) * 3600000).toISOString();
 }
 
-export function readCount() {
+export function readCount({ withTimestamp = false } = {}) {
   return new Promise((resolve, reject) => {
     const socket = new WebSocket(ENDPOINT, {
       origin: "https://leetcode.com", handshakeTimeout: 15000,
@@ -31,7 +31,11 @@ export function readCount() {
       clearTimeout(timer);
       if (socket.readyState === WebSocket.OPEN) socket.close(4000, "Hourly sample received");
       else socket.terminate();
-      if (error) reject(error); else resolve(validCount(count));
+      if (error) reject(error);
+      else {
+        const value = validCount(count);
+        resolve(withTimestamp ? { count: value, capturedAt: new Date().toISOString() } : value);
+      }
     }
     socket.on("message", (data, binary) => {
       if (binary) return;
@@ -62,17 +66,33 @@ export function appendObservation(history, count, capturedAt) {
   };
 }
 
-export async function readSourceCount() {
-  try { return await readCount(); }
+export async function readSourceObservation() {
+  try { return await readCount({ withTimestamp: true }); }
   catch (directError) {
     console.log("Direct source unavailable; reading the official Online badge in the browser.");
     const { readCountInBrowser } = await import("./browser-read.mjs");
-    try { return await readCountInBrowser(); }
+    try { return await readCountInBrowser({ withTimestamp: true }); }
     catch (browserError) { throw new Error(`${directError.message}; ${browserError.message}`); }
   }
 }
 
-export async function collect({ path = HISTORY, reader = readSourceCount, clock = () => new Date() } = {}) {
+export async function readSourceCount() {
+  return validCount((await readSourceObservation()).count);
+}
+
+export function validateObservation(value, now) {
+  const structured = value !== null && typeof value === "object";
+  const count = validCount(structured ? value.count : value);
+  const capturedAt = structured ? value.capturedAt : new Date(now).toISOString();
+  const observedTime = typeof capturedAt === "string" ? Date.parse(capturedAt) : NaN;
+  const currentTime = new Date(now).getTime();
+  if (!Number.isFinite(observedTime) || observedTime > currentTime + 1000 || currentTime - observedTime > 120000) {
+    throw new Error("Invalid or stale observation time");
+  }
+  return { count, capturedAt: new Date(observedTime).toISOString() };
+}
+
+export async function collect({ path = HISTORY, reader = readSourceObservation, clock = () => new Date() } = {}) {
   const history = JSON.parse(await readFile(path, "utf8"));
   if (!Array.isArray(history.observations)) throw new Error("Invalid history file");
   if (history.observations.some((record) => record.hour === hourKey(clock()))) {
@@ -81,8 +101,9 @@ export async function collect({ path = HISTORY, reader = readSourceCount, clock 
   }
   // A failed read throws before any history is written. Missing hours remain
   // missing; a security challenge is never converted into an observed zero.
-  const count = validCount(await reader());
-  const { history: next, added } = appendObservation(history, count, clock());
+  const observed = await reader();
+  const { count, capturedAt } = validateObservation(observed, clock());
+  const { history: next, added } = appendObservation(history, count, capturedAt);
   if (!added) return;
   const temporary = `${path}.tmp`;
   await writeFile(temporary, JSON.stringify(next, null, 2) + "\n", "utf8");

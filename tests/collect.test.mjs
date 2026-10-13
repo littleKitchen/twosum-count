@@ -131,3 +131,28 @@ test("collecting after a gap appends only the current observed hour", async (t) 
     { hour: observedHour, capturedAt: observedAt, count: 95 },
   ]);
 });
+
+test("browser shutdown crossing an hour keeps the actual observation hour", async (t) => {
+  const { path } = await fixture(t);
+  let now = new Date("2026-10-13T18:59:50.000Z");
+  await collect({
+    path, clock: () => now,
+    reader: async () => {
+      now = new Date("2026-10-13T19:00:03.000Z");
+      return { count: 67, capturedAt: "2026-10-13T18:59:59.000Z" };
+    },
+  });
+  assert.deepEqual(JSON.parse(await readFile(path, "utf8")).observations, [
+    { hour: observedHour, capturedAt: "2026-10-13T18:59:59.000Z", count: 67 },
+  ]);
+});
+
+test("stale, missing and future source timestamps do not change saved data", async (t) => {
+  const { path, original } = await fixture(t);
+  for (const capturedAt of [undefined, "invalid", "2026-10-13T18:04:59.000Z", "2026-10-13T18:08:00.000Z"]) {
+    await assert.rejects(collect({
+      path, clock: () => new Date(observedAt), reader: async () => ({ count: 23, capturedAt }),
+    }), /observation time/);
+    assert.equal(await readFile(path, "utf8"), original);
+  }
+});
