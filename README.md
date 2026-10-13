@@ -15,6 +15,8 @@ GitHub Actions collects the counts and GitHub Pages hosts the website. Collectio
 
 The chart uses **Pacific Time (PT)** through `America/Los_Angeles`, including daylight saving time. Stored timestamps use UTC. GitHub's scheduler can run late, so the recorded timestamp reflects the actual measurement rather than the planned start time.
 
+Points are positioned at their hourly bucket on the x-axis. Each tooltip labels that **Hour** separately from the actual **Captured** timestamp; a count collected at 2:36 PM belongs to the 2:00 PM hour, without claiming it was measured at 2:00 PM.
+
 Failed or missing samples remain gaps. They are never replaced with zero, estimates, or fabricated historical values. A genuine zero received from the source is valid.
 
 The page is entirely in English. `history.json` keeps at most **six calendar months** of samples. Each collection run removes older records automatically, including runs where the current hour is already recorded or the source read fails. Stored history keeps six months while the chart displays only the most recent 30 days.

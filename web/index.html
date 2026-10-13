@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="Hourly online users on LeetCode Two Sum. A 30-day trend chart in Pacific Time.">
     <title>Two Sum Online Users</title>
-    <link rel="stylesheet" href="./style.css?v=3">
-    <script src="./chart.js?v=3" defer></script>
+    <link rel="stylesheet" href="./style.css?v=4">
+    <script src="./chart.js?v=4" defer></script>
   </head>
   <body>
     <main>
@@ -15,15 +15,14 @@
         <div class="chart-frame">
           <div id="y-axis" class="y-axis" aria-hidden="true"></div>
           <div id="chart-plot" class="chart-plot">
-            <svg id="chart" height="360" role="img" aria-labelledby="chart-title chart-description">
-              <title id="chart-title">Two Sum hourly online users</title>
+            <svg id="chart" height="360" role="img" aria-label="Two Sum hourly online users" aria-describedby="chart-description">
               <desc id="chart-description">Loading hourly online counts.</desc>
             </svg>
             <output id="chart-tooltip" class="chart-tooltip" hidden></output>
           </div>
           <p id="empty-state" class="empty-state" role="status">Loading data…</p>
         </div>
-        <figcaption id="caption">Last 30 days of hourly samples · Pacific Time (PT) · Missing samples are gaps.</figcaption>
+        <figcaption id="caption">Last 30 days · Grouped by hour · Pacific Time (PT) · Missing samples are gaps.</figcaption>
       </figure>
       <noscript><p class="no-script">Enable JavaScript to view the online count chart.</p></noscript>
     </main>

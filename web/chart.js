@@ -9,7 +9,7 @@
   const BOTTOM = 286;
   const HEIGHT = 360;
   const EDGE = 12;
-  const BASE_CAPTION = "Last 30 days of hourly samples · Pacific Time (PT) · Missing samples are gaps.";
+  const BASE_CAPTION = "Last 30 days · Grouped by hour · Pacific Time (PT) · Missing samples are gaps.";
   const numberFormat = new Intl.NumberFormat("en-US");
   const hourFormat = new Intl.DateTimeFormat("en-US", {
     timeZone: TIME_ZONE, hour: "numeric", minute: "2-digit",
@@ -20,6 +20,10 @@
   const fullFormat = new Intl.DateTimeFormat("en-US", {
     timeZone: TIME_ZONE, year: "numeric", month: "short", day: "numeric",
     hour: "numeric", minute: "2-digit", second: "2-digit", timeZoneName: "short",
+  });
+  const sampleHourFormat = new Intl.DateTimeFormat("en-US", {
+    timeZone: TIME_ZONE, year: "numeric", month: "short", day: "numeric",
+    hour: "numeric", minute: "2-digit", timeZoneName: "short",
   });
 
   const svg = document.getElementById("chart");
@@ -72,6 +76,10 @@
     return Math.ceil(rawStep / magnitude) * magnitude * 4;
   }
 
+  function sampleDetails(item) {
+    return `${numberFormat.format(item.count)} online\nHour: ${sampleHourFormat.format(item.hour)}\nCaptured: ${fullFormat.format(item.capturedAt)}`;
+  }
+
   function drawChart() {
     const end = Math.floor(Date.now() / HOUR) * HOUR;
     const cutoff = end - WINDOW;
@@ -91,9 +99,8 @@
     geometry = { start, end, width, right, x, y };
     byHour = new Map(displayed.map((item) => [item.hour, item]));
     const content = document.createDocumentFragment();
-    content.append(svgNode("title", { id: "chart-title" }, "Two Sum hourly online users"));
     const description = displayed.length
-      ? `${displayed.length} hourly samples from ${fullFormat.format(displayed[0].hour)} to ${fullFormat.format(displayed[displayed.length - 1].hour)}. Time is Pacific Time. Missing samples are gaps.`
+      ? `${displayed.length} samples grouped by hour from ${sampleHourFormat.format(displayed[0].hour)} to ${sampleHourFormat.format(displayed[displayed.length - 1].hour)}. Tooltips show the hour and actual capture time separately. Missing samples are gaps.`
       : "No recorded samples in the last 30 days. Time is Pacific Time. Missing samples are gaps.";
     content.append(svgNode("desc", { id: "chart-description" }, description));
     axis.replaceChildren();
@@ -126,7 +133,7 @@
       } else {
         label.append(svgNode("tspan", { x: position }, date));
       }
-      label.append(svgNode("title", {}, fullFormat.format(hour)));
+      label.setAttribute("aria-label", sampleHourFormat.format(hour));
       content.append(label);
     }
 
@@ -145,7 +152,7 @@
     const showValues = displayed.length <= 12 && displayed.every((item, index) => index === 0 || x(item.hour) - x(displayed[index - 1].hour) >= 52);
     for (const item of displayed) {
       const point = svgNode("circle", { cx: x(item.hour), cy: y(item.count), r: radius, class: "point" });
-      point.append(svgNode("title", {}, `${numberFormat.format(item.count)} online · Captured ${fullFormat.format(item.capturedAt)}`));
+      point.setAttribute("aria-label", sampleDetails(item));
       content.append(point);
       if (showValues) content.append(svgNode("text", {
         x: x(item.hour), y: y(item.count) - 11,
@@ -178,7 +185,7 @@
     const hour = Math.round((geometry.start + fraction * (geometry.end - geometry.start)) / HOUR) * HOUR;
     const item = byHour.get(hour);
     if (!item) { tooltip.hidden = true; return; }
-    tooltip.textContent = `${numberFormat.format(item.count)} online · ${fullFormat.format(item.capturedAt)}`;
+    tooltip.textContent = sampleDetails(item);
     tooltip.hidden = false;
     const left = Math.max(0, Math.min(geometry.width - tooltip.offsetWidth, geometry.x(item.hour) - tooltip.offsetWidth / 2));
     tooltip.style.left = `${left}px`;
