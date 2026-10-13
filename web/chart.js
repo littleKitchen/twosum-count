@@ -12,18 +12,14 @@
   const BASE_CAPTION = "Last 30 days · Actual capture times · Pacific Time (PT) · Missing samples are gaps.";
   const numberFormat = new Intl.NumberFormat("en-US");
   const hourFormat = new Intl.DateTimeFormat("en-US", {
-    timeZone: TIME_ZONE, hour: "numeric", minute: "2-digit",
+    timeZone: TIME_ZONE, hour: "numeric", minute: "2-digit", second: "2-digit",
   });
   const dateFormat = new Intl.DateTimeFormat("en-US", {
-    timeZone: TIME_ZONE, month: "short", day: "numeric",
+    timeZone: TIME_ZONE, month: "short", day: "numeric", timeZoneName: "short",
   });
   const fullFormat = new Intl.DateTimeFormat("en-US", {
     timeZone: TIME_ZONE, year: "numeric", month: "short", day: "numeric",
     hour: "numeric", minute: "2-digit", second: "2-digit", timeZoneName: "short",
-  });
-  const sampleHourFormat = new Intl.DateTimeFormat("en-US", {
-    timeZone: TIME_ZONE, year: "numeric", month: "short", day: "numeric",
-    hour: "numeric", minute: "2-digit", timeZoneName: "short",
   });
 
   const svg = document.getElementById("chart");
@@ -113,28 +109,26 @@
       axis.append(label);
     }
 
-    const firstTick = Math.ceil(start / HOUR) * HOUR;
-    const lastTick = Math.floor(end / HOUR) * HOUR;
-    const hours = Math.max(0, Math.round((lastTick - firstTick) / HOUR));
-    const tickCount = Math.min(hours + 1, 8, Math.max(2, Math.floor((right - EDGE) / 100) + 1));
-    const compactRange = end - start <= 2 * 24 * HOUR;
-    const seenDates = new Set();
-    const endDate = dateFormat.format(lastTick);
-    for (let index = 0; index < tickCount; index += 1) {
-      const hour = firstTick + Math.round(hours * index / Math.max(1, tickCount - 1)) * HOUR;
-      const date = dateFormat.format(hour);
-      if (!compactRange && (seenDates.has(date) || (date === endDate && index !== tickCount - 1))) continue;
-      seenDates.add(date);
-      const position = x(hour);
-      const anchor = position - EDGE < 36 ? "start" : right - position < 36 ? "end" : "middle";
-      const label = svgNode("text", { x: position, y: 314, "text-anchor": anchor, class: "axis" });
-      if (compactRange) {
-        label.append(svgNode("tspan", { x: position }, hourFormat.format(hour)));
-        label.append(svgNode("tspan", { x: position, dy: 17 }, date));
-      } else {
-        label.append(svgNode("tspan", { x: position }, date));
+    const tickLimit = Math.min(8, Math.max(2, Math.floor((right - EDGE) / 100) + 1));
+    const selectedTicks = new Map();
+    if (displayed.length <= tickLimit) {
+      for (const item of displayed) selectedTicks.set(item.capturedAt, item);
+    } else {
+      const first = displayed[0].capturedAt;
+      const last = displayed[displayed.length - 1].capturedAt;
+      for (let index = 0; index < tickLimit; index += 1) {
+        const target = first + (last - first) * index / (tickLimit - 1);
+        const item = displayed.reduce((closest, record) => Math.abs(record.capturedAt - target) < Math.abs(closest.capturedAt - target) ? record : closest, displayed[0]);
+        selectedTicks.set(item.capturedAt, item);
       }
-      label.setAttribute("aria-label", sampleHourFormat.format(hour));
+    }
+    for (const item of [...selectedTicks.values()].sort((a, b) => a.capturedAt - b.capturedAt)) {
+      const position = x(item.capturedAt);
+      const label = svgNode("text", { x: position, y: 314, "text-anchor": "middle", class: "axis" });
+      label.append(svgNode("tspan", { x: position }, hourFormat.format(item.capturedAt)));
+      label.append(svgNode("tspan", { x: position, dy: 17 }, dateFormat.format(item.capturedAt)));
+      label.setAttribute("data-captured-at", new Date(item.capturedAt).toISOString());
+      label.setAttribute("aria-label", fullFormat.format(item.capturedAt));
       content.append(label);
     }
 
@@ -164,6 +158,24 @@
     svg.setAttribute("width", String(width));
     svg.setAttribute("viewBox", `0 0 ${width} ${HEIGHT}`);
     svg.replaceChildren(content);
+    // Measure the real rendered text. Keep the latest tick and omit labels
+    // that would overlap, without inventing or rounding a sample timestamp.
+    const bounds = svg.getBoundingClientRect();
+    const ticks = [...svg.querySelectorAll(".axis")];
+    for (const label of ticks) {
+      const box = label.getBoundingClientRect();
+      if (box.left < bounds.left + 2) label.setAttribute("text-anchor", "start");
+      else if (box.right > bounds.right - 2) label.setAttribute("text-anchor", "end");
+    }
+    if (ticks.length > 1) {
+      const lastBounds = ticks[ticks.length - 1].getBoundingClientRect();
+      let previousRight = -Infinity;
+      for (const label of ticks.slice(0, -1)) {
+        const box = label.getBoundingClientRect();
+        if (box.left >= previousRight + 8 && box.right + 8 <= lastBounds.left) previousRight = box.right;
+        else label.remove();
+      }
+    }
   }
 
   function showState(error = false) {
