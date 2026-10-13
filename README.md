@@ -8,8 +8,8 @@
 
 公开网页：https://littlekitchen.github.io/twosum-count/
 
-当前通过采集电脑中正常打开的 Two Sum 浏览器页面读取真实人数，由每小时的 Codex 自动任务保存并推送到 GitHub。访问网页的人不需要安装软件或登录；历史数据保存在公开仓库中，采集电脑关闭时仍能查看已保存的历史。新增采样需要采集电脑、Codex 和浏览器保持运行。
+访问网页的人不需要安装软件或登录；历史数据保存在公开仓库中。页面中已有两条从真实 Two Sum 浏览器页面读取的记录。
 
-GitHub Actions 云端采集实测受到 LeetCode 的安全验证拦截，尚未启用其每小时定时任务。`hourly.yml` 仅供手动验证，不承担当前采集。
+项目要求完全在云端每小时自动采集。GitHub Actions 的 Linux 云端采集实测受到 LeetCode 的安全验证拦截，尚未启用每小时定时任务，本机自动任务保持关闭。云端采集验证通过前，页面仅展示已保存的真实历史。`hourly.yml` 和 `source-probe.yml` 用于手动验证。
 
 每次推送后，`pages.yml` 将 `web/` 发布到 GitHub Pages。网页会自动检查更新；显示的每个点对应该小时实际成功采集的第一次人数，鼠标停在点上可查看实际采集时间。时区采用 `America/Los_Angeles`，自动处理夏令时。

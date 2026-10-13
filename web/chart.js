@@ -165,8 +165,7 @@
       ? "正在读取数据…"
       : error ? "暂时无法读取数据，稍后自动重试" : "尚未采集到在线人数";
     const collectionNote = collectionStatus === "blocked"
-      ? " 自动采集尚受 LeetCode 验证阻拦，目前仅显示已验证的历史记录。"
-      : collectionStatus === "local-browser" ? " 每小时采集依赖采集电脑和浏览器保持运行。" : "";
+      ? " 云端自动采集尚受 LeetCode 验证阻拦，目前仅显示已验证的历史记录。" : "";
     caption.textContent = `${error && observations.length ? "更新失败，显示已保存的数据。" : ""}${BASE_CAPTION}${collectionNote}`;
   }
 
