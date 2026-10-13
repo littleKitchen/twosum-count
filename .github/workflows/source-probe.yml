@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       provider:
-        description: Cloud browser to verify
+        description: Cloud source reader to verify
         type: choice
-        options: [system-chrome, tinyfish, websocket]
+        options: [system-chrome, tinyfish, websocket, curl-websocket]
         default: system-chrome
       platform:
         description: GitHub cloud platform
@@ -36,8 +36,14 @@ jobs:
       - name: Install Google Chrome
         if: inputs.provider == 'system-chrome'
         run: npx playwright install chrome
+      - name: Install the standard curl WebSocket transport
+        if: inputs.provider == 'curl-websocket'
+        run: python3 -m pip install --disable-pip-version-check 'curl_cffi==0.16.3'
+      - name: Probe a fresh counter frame with curl
+        if: inputs.provider == 'curl-websocket'
+        run: python3 scripts/probe-curl-websocket.py
       - name: Read a fresh online count without saving history
-        if: runner.os != 'Linux' || inputs.provider != 'system-chrome'
+        if: inputs.provider != 'curl-websocket' && (runner.os != 'Linux' || inputs.provider != 'system-chrome')
         run: node scripts/probe-source.mjs
         env:
           COLLECT_BROWSER_HEADLESS: '0'
