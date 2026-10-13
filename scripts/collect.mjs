@@ -21,6 +21,7 @@ export function readCount() {
     const socket = new WebSocket(ENDPOINT, {
       origin: "https://leetcode.com", handshakeTimeout: 15000,
       followRedirects: false, maxPayload: 1024,
+      headers: { "User-Agent": "TwoSumHourly/1.0 (+https://github.com/littleKitchen/twosum-count)" },
     });
     let finished = false;
     const timer = setTimeout(() => finish(undefined, new Error("No online count received within 20 seconds")), 20000);
@@ -64,7 +65,7 @@ export function appendObservation(history, count, capturedAt) {
 export async function readSourceCount() {
   try { return await readCount(); }
   catch (directError) {
-    console.log("Direct source unavailable; reading the official Online badge in Chromium.");
+    console.log("Direct source unavailable; reading the official Online badge in the browser.");
     const { readCountInBrowser } = await import("./browser-read.mjs");
     try { return await readCountInBrowser(); }
     catch (browserError) { throw new Error(`${directError.message}; ${browserError.message}`); }

@@ -18,7 +18,11 @@ export async function readCountInBrowser({ timeoutMs = 60000 } = {}) {
   const deadline = Date.now() + timeoutMs;
   const remaining = () => Math.max(1, deadline - Date.now());
   try {
-    browser = await chromium.launch({ headless: process.env.COLLECT_BROWSER_HEADLESS !== "0", timeout: Math.min(30000, remaining()) });
+    browser = await chromium.launch({
+      headless: process.env.COLLECT_BROWSER_HEADLESS !== "0",
+      timeout: Math.min(30000, remaining()),
+      ...(process.env.COLLECT_BROWSER_CHANNEL === "chrome" ? { channel: "chrome" } : {}),
+    });
     const context = await browser.newContext({ locale: "en-US" });
     page = await context.newPage();
     page.setDefaultTimeout(Math.min(5000, remaining()));
