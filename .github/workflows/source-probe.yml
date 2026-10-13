@@ -8,13 +8,18 @@ on:
         type: choice
         options: [system-chrome, tinyfish]
         default: system-chrome
+      platform:
+        description: GitHub cloud platform
+        type: choice
+        options: [macos-15-intel, windows-latest, ubuntu-latest]
+        default: macos-15-intel
 
 permissions:
   contents: read
 
 jobs:
   probe:
-    runs-on: ${{ inputs.provider == 'tinyfish' && 'ubuntu-latest' || 'macos-15-intel' }}
+    runs-on: ${{ inputs.provider == 'tinyfish' && 'ubuntu-latest' || inputs.platform }}
     timeout-minutes: 8
     steps:
       - name: Check out the source reader
@@ -32,6 +37,7 @@ jobs:
         if: inputs.provider != 'tinyfish'
         run: npx playwright install chrome
       - name: Read a fresh online count without saving history
+        if: runner.os != 'Linux' || inputs.provider == 'tinyfish'
         run: node scripts/probe-source.mjs
         env:
           COLLECT_BROWSER_HEADLESS: '0'
@@ -41,3 +47,13 @@ jobs:
           COLLECT_SOURCE_DIAGNOSTICS: '1'
           COLLECT_PROVIDER: ${{ inputs.provider }}
           TINYFISH_API_KEY: ${{ inputs.provider == 'tinyfish' && secrets.TINYFISH_API_KEY || '' }}
+      - name: Read a fresh online count in Linux desktop
+        if: runner.os == 'Linux' && inputs.provider != 'tinyfish'
+        run: xvfb-run --auto-servernum node scripts/probe-source.mjs
+        env:
+          COLLECT_BROWSER_HEADLESS: '0'
+          COLLECT_BROWSER_CHANNEL: chrome
+          COLLECT_BROWSER_SYSTEM: '1'
+          COLLECT_BROWSER_WARMUP: '1'
+          COLLECT_SOURCE_DIAGNOSTICS: '1'
+          COLLECT_PROVIDER: system-chrome
