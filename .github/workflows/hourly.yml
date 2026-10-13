@@ -1,7 +1,7 @@
 name: Record Two Sum online count
 on:
   schedule:
-    - cron: '17 * * * *'
+    - cron: '23 * * * *'
   workflow_dispatch:
 
 concurrency:

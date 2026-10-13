@@ -8,12 +8,14 @@ GitHub Actions collects the counts and GitHub Pages hosts the website. Collectio
 
 ## How it works
 
-1. Every hour at minute **17**, GitHub Actions opens a fresh connection to LeetCode's public Two Sum counter at `wss://collaboration-ws.leetcode.com/problems/two-sum`.
+1. GitHub Actions is scheduled to open a fresh connection to LeetCode's public Two Sum counter at `wss://collaboration-ws.leetcode.com/problems/two-sum` every hour at minute **23**.
 2. The collector accepts a numeric text message and records the count together with the time it was received.
 3. The first successful sample for that hour is saved in [`web/data/history.json`](web/data/history.json). The same workflow publishes the updated chart to GitHub Pages.
 4. The page checks for newly published data every minute. One responsive chart fits the most recent **30 days** on screen without horizontal scrolling; before a full month has accumulated, it shows the available history. Hover or tap the chart to see a sample's count and actual collection time.
 
 The chart uses **Pacific Time (PT)** through `America/Los_Angeles`, including daylight saving time. Stored timestamps use UTC. GitHub's scheduler can run late, so the recorded timestamp reflects the actual measurement rather than the planned start time.
+
+Initial records include setup and manual validation samples, so their intervals are irregular. A configured schedule does not guarantee exact 60-minute intervals: GitHub Actions may delay or drop scheduled events. The [workflow run history](https://github.com/littleKitchen/twosum-count/actions/workflows/hourly.yml) distinguishes automatic (`schedule`) runs from manual (`workflow_dispatch`) runs.
 
 Points and x-axis labels use actual `capturedAt` timestamps, including seconds, and tooltips show that same time. A count collected at 2:36:37 PM is plotted and labeled at 2:36:37 PM. Longer histories use a readable selection of real sample times as axis labels. The hourly bucket remains only a storage key to keep the first successful sample per hour.
 
