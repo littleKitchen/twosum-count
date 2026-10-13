@@ -3,7 +3,15 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "scripts": { "collect": "node scripts/collect.mjs", "test": "node --test tests/*.test.mjs" },
-  "engines": { "node": ">=22" },
-  "dependencies": { "ws": "^8.18.3" }
+  "scripts": {
+    "collect": "node scripts/collect.mjs",
+    "test": "node --test tests/*.test.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "playwright": "^1.64.0",
+    "ws": "^8.18.3"
+  }
 }

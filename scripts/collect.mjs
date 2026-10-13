@@ -61,7 +61,17 @@ export function appendObservation(history, count, capturedAt) {
   };
 }
 
-export async function collect({ path = HISTORY, reader = readCount, clock = () => new Date() } = {}) {
+export async function readSourceCount() {
+  try { return await readCount(); }
+  catch (directError) {
+    console.log("Direct source unavailable; reading the official Online badge in Chromium.");
+    const { readCountInBrowser } = await import("./browser-read.mjs");
+    try { return await readCountInBrowser(); }
+    catch (browserError) { throw new Error(`${directError.message}; ${browserError.message}`); }
+  }
+}
+
+export async function collect({ path = HISTORY, reader = readSourceCount, clock = () => new Date() } = {}) {
   const history = JSON.parse(await readFile(path, "utf8"));
   if (!Array.isArray(history.observations)) throw new Error("Invalid history file");
   if (history.observations.some((record) => record.hour === hourKey(clock()))) {
