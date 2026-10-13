@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="LeetCode 国际站 Two Sum 每小时在线人数，时间为 PT。">
+    <title>Two Sum 每小时在线人数</title>
+    <link rel="stylesheet" href="./style.css">
+    <script src="./chart.js" defer></script>
+  </head>
+  <body>
+    <main>
+      <h1>Two Sum 每小时在线人数</h1>
+      <figure>
+        <div class="chart-frame">
+          <div id="y-axis" class="y-axis" aria-hidden="true"></div>
+          <div id="chart-scroll" class="chart-scroll" tabindex="0" aria-label="每小时在线人数图，可横向滚动查看历史">
+            <svg id="chart" height="360" role="img" aria-labelledby="chart-title chart-description">
+              <title id="chart-title">Two Sum 每小时在线人数</title>
+              <desc id="chart-description">正在读取每小时在线人数。</desc>
+            </svg>
+          </div>
+          <p id="empty-state" class="empty-state" role="status">正在读取数据…</p>
+        </div>
+        <figcaption id="caption">时间为 PT（太平洋时间），没有采样的小时留空。</figcaption>
+      </figure>
+      <noscript><p class="no-script">请启用 JavaScript 以查看在线人数图。</p></noscript>
+    </main>
+  </body>
+</html>
