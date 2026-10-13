@@ -25,7 +25,9 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm test
       - name: Collect a genuine sample
-        run: npm run collect
+        run: xvfb-run --auto-servernum npm run collect
+        env:
+          COLLECT_BROWSER_HEADLESS: '0'
       - name: Save history
         run: |
           git config user.name "github-actions[bot]"

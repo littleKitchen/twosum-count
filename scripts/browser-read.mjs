@@ -18,7 +18,7 @@ export async function readCountInBrowser({ timeoutMs = 60000 } = {}) {
   const deadline = Date.now() + timeoutMs;
   const remaining = () => Math.max(1, deadline - Date.now());
   try {
-    browser = await chromium.launch({ headless: true, timeout: Math.min(30000, remaining()) });
+    browser = await chromium.launch({ headless: process.env.COLLECT_BROWSER_HEADLESS !== "0", timeout: Math.min(30000, remaining()) });
     const context = await browser.newContext({ locale: "en-US" });
     page = await context.newPage();
     page.setDefaultTimeout(Math.min(5000, remaining()));
@@ -34,18 +34,10 @@ export async function readCountInBrowser({ timeoutMs = 60000 } = {}) {
       waitUntil: "domcontentloaded", timeout: Math.min(30000, remaining()),
     });
     status = response?.status() ?? null;
-    if (CHALLENGE.test((await page.title()).trim())) {
-      throw new Error("LeetCode displayed a security challenge; no count was collected");
-    }
-
-    const challenge = page.getByText(CHALLENGE).first();
-    const result = await Promise.race([
-      badge.waitFor({ state: "visible", timeout: remaining() }).then(() => "count"),
-      challenge.waitFor({ state: "visible", timeout: remaining() }).then(() => "challenge"),
-    ]);
-    if (result === "challenge") {
-      throw new Error("LeetCode displayed a security challenge; no count was collected");
-    }
+    // A normal browser can finish the site's automatic loading checks without
+    // interaction. Allow that bounded load to complete; never click a CAPTCHA,
+    // alter browser security, inject clearance cookies, or evade fingerprinting.
+    await badge.waitFor({ state: "visible", timeout: remaining() });
     const text = (await badge.innerText({ timeout: remaining() })).trim();
     if (!BADGE.test(text)) throw new Error("LeetCode's visible Online badge did not contain a valid count");
     const count = Number(text.match(/^\d+/)[0]);
@@ -56,8 +48,8 @@ export async function readCountInBrowser({ timeoutMs = 60000 } = {}) {
     // request headers, screenshots, or arbitrary console messages.
     const title = page ? await page.title().catch(() => "unavailable") : "unavailable";
     const badgeCount = page ? await page.getByText(BADGE).count().catch(() => 0) : 0;
-    const reason = /security challenge/.test(error.message)
-      ? error.message
+    const reason = CHALLENGE.test(title.trim())
+      ? "LeetCode still displayed a security challenge after the browser sampling window; no count was collected"
       : "LeetCode did not provide a visible Online count within the browser sampling window";
     throw new Error(`${reason}. Diagnostics: ${JSON.stringify({
       title: title.slice(0, 120), status, onlineBadges: badgeCount, webSockets: sockets,
