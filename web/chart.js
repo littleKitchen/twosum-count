@@ -2,53 +2,53 @@
   "use strict";
 
   const HOUR = 3_600_000;
+  const WINDOW = 30 * 24 * HOUR;
   const TIME_ZONE = "America/Los_Angeles";
   const SVG_NS = "http://www.w3.org/2000/svg";
   const TOP = 30;
   const BOTTOM = 286;
   const HEIGHT = 360;
-  const HOUR_WIDTH = 58;
-  const EDGE = 24;
-  const BASE_CAPTION = "时间为 PT（太平洋时间），没有采样的小时留空。";
-  const numberFormat = new Intl.NumberFormat("zh-CN");
-  const hourFormat = new Intl.DateTimeFormat("zh-CN", {
-    timeZone: TIME_ZONE, hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  const EDGE = 12;
+  const BASE_CAPTION = "Last 30 days of hourly samples · Pacific Time (PT) · Missing samples are gaps.";
+  const numberFormat = new Intl.NumberFormat("en-US");
+  const hourFormat = new Intl.DateTimeFormat("en-US", {
+    timeZone: TIME_ZONE, hour: "numeric", minute: "2-digit",
   });
-  const dateFormat = new Intl.DateTimeFormat("zh-CN", {
-    timeZone: TIME_ZONE, month: "2-digit", day: "2-digit",
+  const dateFormat = new Intl.DateTimeFormat("en-US", {
+    timeZone: TIME_ZONE, month: "short", day: "numeric",
   });
-  const fullFormat = new Intl.DateTimeFormat("zh-CN", {
-    timeZone: TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit",
-    hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23",
-    timeZoneName: "short",
+  const fullFormat = new Intl.DateTimeFormat("en-US", {
+    timeZone: TIME_ZONE, year: "numeric", month: "short", day: "numeric",
+    hour: "numeric", minute: "2-digit", second: "2-digit", timeZoneName: "short",
   });
 
   const svg = document.getElementById("chart");
-  const scroll = document.getElementById("chart-scroll");
+  const plot = document.getElementById("chart-plot");
   const axis = document.getElementById("y-axis");
   const emptyState = document.getElementById("empty-state");
   const caption = document.getElementById("caption");
+  const tooltip = document.getElementById("chart-tooltip");
   let observations = [];
+  let displayed = [];
+  let byHour = new Map();
+  let geometry = null;
   let collectionStatus = "";
   let requestNumber = 0;
   let controller = null;
   let hasRead = false;
   let stopped = false;
   let lastChartKey = "";
-  let positioned = false;
 
   function svgNode(name, attributes = {}, text = null) {
     const node = document.createElementNS(SVG_NS, name);
-    for (const [key, value] of Object.entries(attributes)) {
-      node.setAttribute(key, String(value));
-    }
+    for (const [key, value] of Object.entries(attributes)) node.setAttribute(key, String(value));
     if (text !== null) node.textContent = text;
     return node;
   }
 
   function parseHistory(data) {
     if (!data || !Array.isArray(data.observations)) throw new Error("Invalid history");
-    const byHour = new Map();
+    const records = new Map();
     for (const record of data.observations) {
       if (!record || typeof record.hour !== "string" || typeof record.capturedAt !== "string") {
         throw new Error("Invalid observation");
@@ -56,118 +56,137 @@
       const hour = Date.parse(record.hour);
       const capturedAt = Date.parse(record.capturedAt);
       if (!Number.isFinite(hour) || hour % HOUR !== 0 || !Number.isFinite(capturedAt)
+        || Math.floor(capturedAt / HOUR) * HOUR !== hour
         || !Number.isSafeInteger(record.count) || record.count < 0) {
         throw new Error("Invalid observation");
       }
-      const previous = byHour.get(hour);
-      if (!previous || previous.capturedAt < capturedAt) {
-        byHour.set(hour, { hour, capturedAt, count: record.count });
-      }
+      const previous = records.get(hour);
+      if (!previous || capturedAt < previous.capturedAt) records.set(hour, { hour, capturedAt, count: record.count });
     }
-    return [...byHour.values()].sort((first, second) => first.hour - second.hour);
+    return [...records.values()].sort((first, second) => first.hour - second.hour);
   }
 
   function scaleCeiling(maximum) {
     const rawStep = Math.max(1, maximum / 4);
     const magnitude = 10 ** Math.floor(Math.log10(rawStep));
-    const step = Math.ceil(rawStep / magnitude) * magnitude;
-    return step * 4;
+    return Math.ceil(rawStep / magnitude) * magnitude * 4;
   }
 
   function drawChart() {
-    const currentHour = Math.floor(Date.now() / HOUR) * HOUR;
-    const firstHour = observations.length ? observations[0].hour : currentHour;
-    const lastHour = observations.length ? observations[observations.length - 1].hour : currentHour;
-    const start = observations.length ? firstHour : currentHour - HOUR;
-    const end = Math.max(start + HOUR, currentHour, lastHour);
-    const hours = Math.round((end - start) / HOUR) + 1;
-    const chartKey = JSON.stringify([start, end, observations, scroll.clientWidth]);
+    const end = Math.floor(Date.now() / HOUR) * HOUR;
+    const cutoff = end - WINDOW;
+    displayed = observations.filter((record) => record.hour >= cutoff && record.hour <= end);
+    // Use the available history while the project is younger than a month.
+    const start = displayed.length ? Math.min(displayed[0].hour, end - HOUR) : cutoff;
+    const width = Math.max(1, plot.clientWidth);
+    const chartKey = JSON.stringify([start, end, displayed, width]);
     if (chartKey === lastChartKey) return;
     lastChartKey = chartKey;
-
-    const wasAtEnd = scroll.scrollWidth - scroll.clientWidth - scroll.scrollLeft < 5;
-    const oldScrollLeft = scroll.scrollLeft;
-    const width = Math.max(scroll.clientWidth, (hours - 1) * HOUR_WIDTH + EDGE * 2);
-    const right = width - EDGE;
+    tooltip.hidden = true;
+    const right = Math.max(EDGE, width - EDGE);
     const x = (hour) => EDGE + (hour - start) / (end - start) * (right - EDGE);
-    const maximum = observations.reduce((max, item) => Math.max(max, item.count), 0);
+    const maximum = displayed.reduce((max, item) => Math.max(max, item.count), 0);
     const ceiling = scaleCeiling(maximum);
     const y = (count) => BOTTOM - count / ceiling * (BOTTOM - TOP);
+    geometry = { start, end, width, right, x, y };
+    byHour = new Map(displayed.map((item) => [item.hour, item]));
     const content = document.createDocumentFragment();
-    content.append(svgNode("title", { id: "chart-title" }, "Two Sum 每小时在线人数"));
-    const description = observations.length
-      ? observations.map((item) => `${fullFormat.format(item.hour)}，${item.count} 人`).join("；")
-      : "尚无成功采样。横轴为 PT 时间，纵轴为在线人数，没有采样的小时留空。";
+    content.append(svgNode("title", { id: "chart-title" }, "Two Sum hourly online users"));
+    const description = displayed.length
+      ? `${displayed.length} hourly samples from ${fullFormat.format(displayed[0].hour)} to ${fullFormat.format(displayed[displayed.length - 1].hour)}. Time is Pacific Time. Missing samples are gaps.`
+      : "No recorded samples in the last 30 days. Time is Pacific Time. Missing samples are gaps.";
     content.append(svgNode("desc", { id: "chart-description" }, description));
     axis.replaceChildren();
 
     for (let tick = 0; tick <= 4; tick += 1) {
       const position = BOTTOM - tick / 4 * (BOTTOM - TOP);
-      content.append(svgNode("line", {
-        x1: EDGE, y1: position, x2: right, y2: position, class: "grid",
-      }));
+      content.append(svgNode("line", { x1: EDGE, y1: position, x2: right, y2: position, class: "grid" }));
       const label = document.createElement("span");
       label.style.top = `${position}px`;
-      label.textContent = observations.length ? numberFormat.format(ceiling * tick / 4) : "—";
+      label.textContent = displayed.length ? numberFormat.format(ceiling * tick / 4) : "—";
       axis.append(label);
     }
 
-    for (let index = 0; index < hours; index += 1) {
-      const hour = start + index * HOUR;
+    const hours = Math.round((end - start) / HOUR);
+    const tickCount = Math.min(hours + 1, 8, Math.max(2, Math.floor((right - EDGE) / 100) + 1));
+    const compactRange = end - start <= 2 * 24 * HOUR;
+    const seenDates = new Set();
+    const endDate = dateFormat.format(end);
+    for (let index = 0; index < tickCount; index += 1) {
+      const hour = start + Math.round(hours * index / (tickCount - 1)) * HOUR;
+      const date = dateFormat.format(hour);
+      if (!compactRange && (seenDates.has(date) || (date === endDate && index !== tickCount - 1))) continue;
+      seenDates.add(date);
       const position = x(hour);
-      const label = svgNode("text", { x: position, y: 314, "text-anchor": "middle", class: "axis" });
-      label.append(svgNode("tspan", { x: position }, hourFormat.format(hour)));
-      label.append(svgNode("tspan", { x: position, dy: 17 }, dateFormat.format(hour)));
+      const anchor = index === 0 ? "start" : index === tickCount - 1 ? "end" : "middle";
+      const label = svgNode("text", { x: position, y: 314, "text-anchor": anchor, class: "axis" });
+      if (compactRange) {
+        label.append(svgNode("tspan", { x: position }, hourFormat.format(hour)));
+        label.append(svgNode("tspan", { x: position, dy: 17 }, date));
+      } else {
+        label.append(svgNode("tspan", { x: position }, date));
+      }
       label.append(svgNode("title", {}, fullFormat.format(hour)));
       content.append(label);
     }
 
     const segments = [];
-    for (const item of observations) {
+    for (const item of displayed) {
       const segment = segments[segments.length - 1];
-      if (!segment || item.hour - segment[segment.length - 1].hour !== HOUR) {
-        segments.push([item]);
-      } else {
-        segment.push(item);
-      }
+      if (!segment || item.hour - segment[segment.length - 1].hour !== HOUR) segments.push([item]);
+      else segment.push(item);
     }
     for (const segment of segments) {
-      if (segment.length > 1) {
-        content.append(svgNode("polyline", {
-          points: segment.map((item) => `${x(item.hour)},${y(item.count)}`).join(" "),
-          class: "trace",
-        }));
-      }
+      if (segment.length > 1) content.append(svgNode("polyline", {
+        points: segment.map((item) => `${x(item.hour)},${y(item.count)}`).join(" "), class: "trace",
+      }));
     }
-    for (const item of observations) {
-      const point = svgNode("circle", { cx: x(item.hour), cy: y(item.count), r: 3.5, class: "point" });
-      point.append(svgNode("title", {}, `${fullFormat.format(item.hour)}：${numberFormat.format(item.count)} 人；实际采集：${fullFormat.format(item.capturedAt)}`));
+    const radius = displayed.length > 200 ? 1.2 : displayed.length > 12 ? 2 : 3.5;
+    const showValues = displayed.length <= 12 && displayed.every((item, index) => index === 0 || x(item.hour) - x(displayed[index - 1].hour) >= 52);
+    for (const item of displayed) {
+      const point = svgNode("circle", { cx: x(item.hour), cy: y(item.count), r: radius, class: "point" });
+      point.append(svgNode("title", {}, `${numberFormat.format(item.count)} online · Captured ${fullFormat.format(item.capturedAt)}`));
       content.append(point);
-      content.append(svgNode("text", {
-        x: x(item.hour), y: y(item.count) - 11, "text-anchor": "middle", class: "value",
+      if (showValues) content.append(svgNode("text", {
+        x: x(item.hour), y: y(item.count) - 11,
+        "text-anchor": item.hour === start ? "start" : item.hour === end ? "end" : "middle", class: "value",
       }, numberFormat.format(item.count)));
     }
-
     svg.setAttribute("width", String(width));
     svg.setAttribute("viewBox", `0 0 ${width} ${HEIGHT}`);
     svg.replaceChildren(content);
-    if (observations.length && (!positioned || wasAtEnd)) {
-      scroll.scrollLeft = scroll.scrollWidth;
-      positioned = true;
-    } else {
-      scroll.scrollLeft = oldScrollLeft;
-    }
   }
 
   function showState(error = false) {
-    emptyState.hidden = observations.length > 0;
-    emptyState.textContent = !hasRead
-      ? "正在读取数据…"
-      : error ? "暂时无法读取数据，稍后自动重试" : "尚未采集到在线人数";
-    const collectionNote = collectionStatus === "blocked"
-      ? " 云端自动采集尚受 LeetCode 验证阻拦，目前仅显示已验证的历史记录。" : "";
-    caption.textContent = `${error && observations.length ? "更新失败，显示已保存的数据。" : ""}${BASE_CAPTION}${collectionNote}`;
+    emptyState.hidden = displayed.length > 0;
+    emptyState.textContent = !hasRead ? "Loading data…"
+      : error ? "Data is temporarily unavailable. Retrying automatically." : "No recorded samples in the last 30 days.";
+    const collectionNote = collectionStatus === "blocked" ? " Collection is temporarily unavailable; showing recorded history." : "";
+    caption.textContent = `${error && displayed.length ? "Update failed; showing saved data. " : ""}${BASE_CAPTION}${collectionNote}`;
   }
+
+  function showTooltip(event) {
+    if (!geometry || !displayed.length || geometry.right <= EDGE) return;
+    const bounds = plot.getBoundingClientRect();
+    const position = event.clientX - bounds.left;
+    const top = event.clientY - bounds.top;
+    if (position < EDGE || position > geometry.right || top < TOP || top > BOTTOM) {
+      tooltip.hidden = true;
+      return;
+    }
+    const fraction = (position - EDGE) / (geometry.right - EDGE);
+    const hour = Math.round((geometry.start + fraction * (geometry.end - geometry.start)) / HOUR) * HOUR;
+    const item = byHour.get(hour);
+    if (!item) { tooltip.hidden = true; return; }
+    tooltip.textContent = `${numberFormat.format(item.count)} online · ${fullFormat.format(item.capturedAt)}`;
+    tooltip.hidden = false;
+    const left = Math.max(0, Math.min(geometry.width - tooltip.offsetWidth, geometry.x(item.hour) - tooltip.offsetWidth / 2));
+    tooltip.style.left = `${left}px`;
+    tooltip.style.top = `${Math.max(0, geometry.y(item.count) - tooltip.offsetHeight - 12)}px`;
+  }
+  plot.addEventListener("pointermove", showTooltip);
+  plot.addEventListener("pointerdown", showTooltip);
+  plot.addEventListener("pointerleave", () => { tooltip.hidden = true; });
 
   async function readHistory() {
     if (stopped) return;

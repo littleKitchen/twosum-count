@@ -1,30 +1,31 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="LeetCode 国际站 Two Sum 每小时在线人数，时间为 PT。">
-    <title>Two Sum 每小时在线人数</title>
-    <link rel="stylesheet" href="./style.css">
-    <script src="./chart.js?v=2" defer></script>
+    <meta name="description" content="Hourly online users on LeetCode Two Sum. A 30-day trend chart in Pacific Time.">
+    <title>Two Sum Online Users</title>
+    <link rel="stylesheet" href="./style.css?v=3">
+    <script src="./chart.js?v=3" defer></script>
   </head>
   <body>
     <main>
-      <h1>Two Sum 每小时在线人数</h1>
+      <h1>Two Sum online users</h1>
       <figure>
         <div class="chart-frame">
           <div id="y-axis" class="y-axis" aria-hidden="true"></div>
-          <div id="chart-scroll" class="chart-scroll" tabindex="0" aria-label="每小时在线人数图，可横向滚动查看历史">
+          <div id="chart-plot" class="chart-plot">
             <svg id="chart" height="360" role="img" aria-labelledby="chart-title chart-description">
-              <title id="chart-title">Two Sum 每小时在线人数</title>
-              <desc id="chart-description">正在读取每小时在线人数。</desc>
+              <title id="chart-title">Two Sum hourly online users</title>
+              <desc id="chart-description">Loading hourly online counts.</desc>
             </svg>
+            <output id="chart-tooltip" class="chart-tooltip" hidden></output>
           </div>
-          <p id="empty-state" class="empty-state" role="status">正在读取数据…</p>
+          <p id="empty-state" class="empty-state" role="status">Loading data…</p>
         </div>
-        <figcaption id="caption">时间为 PT（太平洋时间），没有采样的小时留空。</figcaption>
+        <figcaption id="caption">Last 30 days of hourly samples · Pacific Time (PT) · Missing samples are gaps.</figcaption>
       </figure>
-      <noscript><p class="no-script">请启用 JavaScript 以查看在线人数图。</p></noscript>
+      <noscript><p class="no-script">Enable JavaScript to view the online count chart.</p></noscript>
     </main>
   </body>
 </html>

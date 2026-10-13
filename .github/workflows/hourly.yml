@@ -17,6 +17,8 @@ jobs:
     timeout-minutes: 8
     permissions:
       contents: write
+    outputs:
+      page_ready: ${{ steps.upload.outcome == 'success' }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -32,26 +34,32 @@ jobs:
       - name: Install the verified source reader
         run: python -m pip install --disable-pip-version-check --requirement requirements.txt
       - run: npm test
-      - name: Collect a genuine sample
+      - name: Collect a genuine sample and prune expired history
+        id: sample
         run: npm run collect
       - name: Save history
+        id: save
+        if: ${{ !cancelled() && (steps.sample.outcome == 'success' || steps.sample.outcome == 'failure') }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add web/data/history.json
           if ! git diff --cached --quiet; then
-            git commit -m "Record hourly Two Sum online count"
+            git commit -m "Update Two Sum hourly history"
             git push origin HEAD:main
           fi
       # GITHUB_TOKEN pushes do not trigger the separate Pages workflow. Upload
       # this updated working tree so the same run publishes its saved sample.
       - name: Upload the updated static page
+        id: upload
+        if: ${{ !cancelled() && steps.save.outcome == 'success' }}
         uses: actions/upload-pages-artifact@v4
         with:
           path: web
 
   deploy:
     needs: collect
+    if: ${{ always() && !cancelled() && needs.collect.outputs.page_ready == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

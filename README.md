@@ -11,11 +11,13 @@ GitHub Actions collects the counts and GitHub Pages hosts the website. Collectio
 1. Every hour at minute **17**, GitHub Actions opens a fresh connection to LeetCode's public Two Sum counter at `wss://collaboration-ws.leetcode.com/problems/two-sum`.
 2. The collector accepts a numeric text message and records the count together with the time it was received.
 3. The first successful sample for that hour is saved in [`web/data/history.json`](web/data/history.json). The same workflow publishes the updated chart to GitHub Pages.
-4. The page checks for newly published data every minute. Scroll horizontally to view older hours; hover over a point to see its actual collection time.
+4. The page checks for newly published data every minute. One responsive chart fits the most recent **30 days** on screen without horizontal scrolling; before a full month has accumulated, it shows the available history. Hover or tap the chart to see a sample's count and actual collection time.
 
 The chart uses **Pacific Time (PT)** through `America/Los_Angeles`, including daylight saving time. Stored timestamps use UTC. GitHub's scheduler can run late, so the recorded timestamp reflects the actual measurement rather than the planned start time.
 
 Failed or missing samples remain gaps. They are never replaced with zero, estimates, or fabricated historical values. A genuine zero received from the source is valid.
+
+The page is entirely in English. `history.json` keeps at most **six calendar months** of samples. Each collection run removes older records automatically, including runs where the current hour is already recorded or the source read fails. Stored history keeps six months while the chart displays only the most recent 30 days.
 
 ## Repository layout
 
