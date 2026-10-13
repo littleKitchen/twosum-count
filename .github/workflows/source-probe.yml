@@ -33,3 +33,4 @@ jobs:
         env:
           COLLECT_BROWSER_HEADLESS: '0'
           COLLECT_BROWSER_CHANNEL: chrome
+          COLLECT_BROWSER_SYSTEM: '1'

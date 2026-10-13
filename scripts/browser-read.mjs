@@ -7,6 +7,10 @@ const CHALLENGE = /^(?:Just a moment\.{0,3}|Verify you are human|Verification re
 // Read the same visible badge that an anonymous visitor sees. This uses ordinary
 // Chromium without saved sessions, credentials, or changes to security checks.
 export async function readCountInBrowser({ timeoutMs = 60000 } = {}) {
+  if (process.env.COLLECT_BROWSER_SYSTEM === "1") {
+    const { readCountInSystemChrome } = await import("./system-chrome-read.mjs");
+    return readCountInSystemChrome({ timeoutMs });
+  }
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0 || timeoutMs > 60000) {
     throw new Error("Browser count timeout must be between 1 and 60000 milliseconds");
   }
