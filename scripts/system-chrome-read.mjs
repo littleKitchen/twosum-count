@@ -78,11 +78,28 @@ async function stopChrome(child) {
   }
 }
 
-async function warmupSourceDocument(page, deadline) {
+export function publicSourcePreview(text, maximumLength = 500) {
+  if (typeof text !== "string") return "";
+  if (/cloudflare|captcha|verify you are human|checking your browser|challenge-platform/i.test(text)) {
+    return "[security challenge content omitted]";
+  }
+  // The anonymous endpoint is public, but even diagnostics should not retain
+  // script source or anything resembling credentials/challenge tokens.
+  if (/<script\b|\b(?:token|cookie|authorization|password|secret|csrf|session|nonce|bearer|signature)\b/i.test(text)
+    || /[A-Za-z0-9_+\/-]{32,}/.test(text)) return "[credential-like or script content omitted]";
+  const limit = Number.isInteger(maximumLength) ? Math.min(500, Math.max(0, maximumLength)) : 500;
+  return text.replace(/[^\x20-\x7E\r\n\t]/g, "?").replace(/\s+/g, " ").trim().slice(0, limit);
+}
+
+async function warmupSourceDocument(page, deadline, diagnosticsEnabled) {
   const result = { initialStatus: null, finalStatus: null, title: "", challengeRemained: false, navigationFailed: false };
+  let latestResponse = null;
   const onResponse = (response) => {
     if (response.request().isNavigationRequest() && response.frame() === page.mainFrame()
-      && response.url().split("?")[0] === DOCUMENT_ENDPOINT) result.finalStatus = response.status();
+      && response.url().split("?")[0] === DOCUMENT_ENDPOINT) {
+      latestResponse = response;
+      result.finalStatus = response.status();
+    }
   };
   page.on("response", onResponse);
   try {
@@ -104,6 +121,18 @@ async function warmupSourceDocument(page, deadline) {
       // clearance-cookie extraction, transfers, injection, or persistence occur.
       await delay(Math.min(500, Math.max(1, deadline - Date.now())));
     }
+    if (diagnosticsEnabled && latestResponse?.status() === 200) {
+      const contentType = await latestResponse.headerValue("content-type").catch(() => null);
+      result.contentType = (contentType ?? "unknown").split(";")[0].trim().slice(0, 80);
+      const challengeMarker = await latestResponse.headerValue("cf-mitigated").catch(() => null);
+      result.cloudflareChallenge = challengeMarker === "challenge";
+      if (!result.cloudflareChallenge && !result.challengeRemained) {
+        // Browsers render text/JSON documents in their body as well. Read only
+        // visible text; do not copy HTML, scripts, response headers, or cookies.
+        const text = await page.locator("body").innerText({ timeout: 1000 }).catch(() => "");
+        result.publicBodyPreview = publicSourcePreview(text, /html/i.test(result.contentType) ? 300 : 500);
+      }
+    }
     return result;
   } finally {
     page.removeListener("response", onResponse);
@@ -121,6 +150,7 @@ export async function readCountInSystemChrome({
     throw new Error("System Chrome sampling is cloud-only and requires a GitHub Actions job");
   }
   const warmupEnabled = process.env.COLLECT_BROWSER_WARMUP === "1";
+  const diagnosticsEnabled = process.env.COLLECT_SOURCE_DIAGNOSTICS === "1";
   const maximumTimeout = warmupEnabled ? 90000 : 60000;
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0 || timeoutMs > maximumTimeout) {
     throw new Error(`System Chrome timeout must be between 1 and ${maximumTimeout} milliseconds`);
@@ -130,10 +160,12 @@ export async function readCountInSystemChrome({
   let profile;
   let child;
   let browser;
+  let networkSession;
   let page;
   let status = null;
   let latestNumericFrame = null;
   let warmup = null;
+  const handshakes = [];
   const sockets = { attempts: 0, closed: 0, errors: 0, receivedFrames: 0, lastErrors: [] };
   const launchError = { value: null };
   try {
@@ -156,7 +188,22 @@ export async function readCountInSystemChrome({
     if (!context) throw new Error("System Chrome did not expose its isolated browser context");
     page = context.pages().find((candidate) => candidate.url() === "about:blank") ?? await context.newPage();
     page.setDefaultTimeout(Math.min(5000, remaining()));
-    if (warmupEnabled) warmup = await warmupSourceDocument(page, Math.min(deadline, Date.now() + 30000));
+    if (diagnosticsEnabled) {
+      networkSession = await context.newCDPSession(page);
+      const officialRequestIds = new Set();
+      networkSession.on("Network.webSocketCreated", ({ requestId, url }) => {
+        if (url === ENDPOINT) officialRequestIds.add(requestId);
+      });
+      networkSession.on("Network.webSocketHandshakeResponseReceived", ({ requestId, response }) => {
+        if (!officialRequestIds.has(requestId)) return;
+        const markerKey = Object.keys(response.headers ?? {}).find((key) => key.toLowerCase() === "cf-mitigated");
+        handshakes.push({ status: response.status, cloudflareChallenge: markerKey !== undefined && response.headers[markerKey] === "challenge" });
+        if (handshakes.length > 5) handshakes.shift();
+      });
+      networkSession.on("Network.webSocketClosed", ({ requestId }) => officialRequestIds.delete(requestId));
+      await networkSession.send("Network.enable");
+    }
+    if (warmupEnabled) warmup = await warmupSourceDocument(page, Math.min(deadline, Date.now() + 30000), diagnosticsEnabled);
     const sourceDeadline = Math.min(deadline, Date.now() + 60000);
     const sourceRemaining = () => Math.max(1, sourceDeadline - Date.now());
     page.on("websocket", (socket) => {
@@ -221,6 +268,7 @@ export async function readCountInSystemChrome({
       title: title.slice(0, 120), status, onlineBadges: badgeCount,
       webSockets: sockets, chromeExitCode: child?.exitCode ?? null,
       ...(warmupEnabled ? { warmup } : {}),
+      ...(diagnosticsEnabled ? { officialWebSocketHandshakes: handshakes } : {}),
     })}`, { cause: error });
   } finally {
     if (browser) await Promise.race([browser.close().catch(() => {}), delay(1500)]);

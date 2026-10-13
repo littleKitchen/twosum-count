@@ -2,17 +2,19 @@ name: Probe Two Sum source from cloud runners
 
 on:
   workflow_dispatch:
+    inputs:
+      provider:
+        description: Cloud browser to verify
+        type: choice
+        options: [system-chrome, tinyfish]
+        default: system-chrome
 
 permissions:
   contents: read
 
 jobs:
   probe:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [macos-15-intel]
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ inputs.provider == 'tinyfish' && 'ubuntu-latest' || 'macos-15-intel' }}
     timeout-minutes: 8
     steps:
       - name: Check out the source reader
@@ -27,6 +29,7 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Install Google Chrome
+        if: inputs.provider != 'tinyfish'
         run: npx playwright install chrome
       - name: Read a fresh online count without saving history
         run: node scripts/probe-source.mjs
@@ -35,3 +38,6 @@ jobs:
           COLLECT_BROWSER_CHANNEL: chrome
           COLLECT_BROWSER_SYSTEM: '1'
           COLLECT_BROWSER_WARMUP: '1'
+          COLLECT_SOURCE_DIAGNOSTICS: '1'
+          COLLECT_PROVIDER: ${{ inputs.provider }}
+          TINYFISH_API_KEY: ${{ inputs.provider == 'tinyfish' && secrets.TINYFISH_API_KEY || '' }}

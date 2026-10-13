@@ -67,6 +67,10 @@ export function appendObservation(history, count, capturedAt) {
 }
 
 export async function readSourceObservation() {
+  if (process.env.COLLECT_PROVIDER === "tinyfish") {
+    const { readCountInTinyFish } = await import("./tinyfish-read.mjs");
+    return readCountInTinyFish({ withTimestamp: true });
+  }
   try { return await readCount({ withTimestamp: true }); }
   catch (directError) {
     console.log("Direct source unavailable; reading the official Online badge in the browser.");
