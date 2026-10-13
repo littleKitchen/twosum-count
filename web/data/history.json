@@ -1,5 +1,19 @@
 {
   "source": "https://leetcode.com/problems/two-sum/",
-  "updatedAt": null,
-  "observations": []
+  "updatedAt": "2026-10-13T19:02:38.860Z",
+  "collectionStatus": "local-browser",
+  "observations": [
+    {
+      "hour": "2026-10-13T18:00:00.000Z",
+      "capturedAt": "2026-10-13T18:02:49.000Z",
+      "count": 1027,
+      "method": "verified-interactive-browser-observation"
+    },
+    {
+      "hour": "2026-10-13T19:00:00.000Z",
+      "capturedAt": "2026-10-13T19:02:38.860Z",
+      "count": 894,
+      "method": "browser-observation"
+    }
+  ]
 }

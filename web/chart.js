@@ -29,6 +29,7 @@
   const emptyState = document.getElementById("empty-state");
   const caption = document.getElementById("caption");
   let observations = [];
+  let collectionStatus = "";
   let requestNumber = 0;
   let controller = null;
   let hasRead = false;
@@ -77,8 +78,8 @@
     const currentHour = Math.floor(Date.now() / HOUR) * HOUR;
     const firstHour = observations.length ? observations[0].hour : currentHour;
     const lastHour = observations.length ? observations[observations.length - 1].hour : currentHour;
-    const start = Math.min(currentHour - 23 * HOUR, firstHour);
-    const end = Math.max(currentHour, lastHour);
+    const start = observations.length ? firstHour : currentHour - HOUR;
+    const end = Math.max(start + HOUR, currentHour, lastHour);
     const hours = Math.round((end - start) / HOUR) + 1;
     const chartKey = JSON.stringify([start, end, observations, scroll.clientWidth]);
     if (chartKey === lastChartKey) return;
@@ -163,7 +164,10 @@
     emptyState.textContent = !hasRead
       ? "正在读取数据…"
       : error ? "暂时无法读取数据，稍后自动重试" : "尚未采集到在线人数";
-    caption.textContent = `${error && observations.length ? "更新失败，显示已保存的数据。" : ""}${BASE_CAPTION}`;
+    const collectionNote = collectionStatus === "blocked"
+      ? " 自动采集尚受 LeetCode 验证阻拦，目前仅显示已验证的历史记录。"
+      : collectionStatus === "local-browser" ? " 每小时采集依赖采集电脑和浏览器保持运行。" : "";
+    caption.textContent = `${error && observations.length ? "更新失败，显示已保存的数据。" : ""}${BASE_CAPTION}${collectionNote}`;
   }
 
   async function readHistory() {
@@ -176,9 +180,11 @@
         cache: "no-store", signal: controller.signal,
       });
       if (!response.ok) throw new Error("History unavailable");
-      const data = parseHistory(await response.json());
+      const raw = await response.json();
+      const data = parseHistory(raw);
       if (stopped || currentRequest !== requestNumber) return;
       observations = data;
+      collectionStatus = typeof raw.collectionStatus === "string" ? raw.collectionStatus : "";
       hasRead = true;
       drawChart();
       showState();
