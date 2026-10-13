@@ -1,9 +1,7 @@
-name: Record Two Sum online count
-on:
+name: Collect and publish Two Sum hourly
+"on":
   schedule:
-    # Temporary scheduler verification; restore 23 * * * * after a genuine
-    # scheduled run has collected and published a sample. History stays hourly.
-    - cron: '*/5 * * * *'
+    - cron: '7 * * * *'
   workflow_dispatch:
 
 concurrency:
