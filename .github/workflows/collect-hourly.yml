@@ -1,7 +1,7 @@
 name: Collect and publish Two Sum hourly
 "on":
   schedule:
-    - cron: '7 * * * *'
+    - cron: '37 * * * *'
   workflow_dispatch:
 
 concurrency:
