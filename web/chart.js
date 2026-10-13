@@ -9,7 +9,7 @@
   const BOTTOM = 286;
   const HEIGHT = 360;
   const EDGE = 12;
-  const BASE_CAPTION = "Last 30 days · Grouped by hour · Pacific Time (PT) · Missing samples are gaps.";
+  const BASE_CAPTION = "Last 30 days · Actual capture times · Pacific Time (PT) · Missing samples are gaps.";
   const numberFormat = new Intl.NumberFormat("en-US");
   const hourFormat = new Intl.DateTimeFormat("en-US", {
     timeZone: TIME_ZONE, hour: "numeric", minute: "2-digit",
@@ -34,7 +34,6 @@
   const tooltip = document.getElementById("chart-tooltip");
   let observations = [];
   let displayed = [];
-  let byHour = new Map();
   let geometry = null;
   let collectionStatus = "";
   let requestNumber = 0;
@@ -67,7 +66,7 @@
       const previous = records.get(hour);
       if (!previous || capturedAt < previous.capturedAt) records.set(hour, { hour, capturedAt, count: record.count });
     }
-    return [...records.values()].sort((first, second) => first.hour - second.hour);
+    return [...records.values()].sort((first, second) => first.capturedAt - second.capturedAt);
   }
 
   function scaleCeiling(maximum) {
@@ -77,30 +76,30 @@
   }
 
   function sampleDetails(item) {
-    return `${numberFormat.format(item.count)} online\nHour: ${sampleHourFormat.format(item.hour)}\nCaptured: ${fullFormat.format(item.capturedAt)}`;
+    return `${numberFormat.format(item.count)} online\nCaptured: ${fullFormat.format(item.capturedAt)}`;
   }
 
   function drawChart() {
-    const end = Math.floor(Date.now() / HOUR) * HOUR;
+    const end = Date.now();
     const cutoff = end - WINDOW;
-    displayed = observations.filter((record) => record.hour >= cutoff && record.hour <= end);
+    displayed = observations.filter((record) => record.capturedAt >= cutoff && record.capturedAt <= end);
     // Use the available history while the project is younger than a month.
-    const start = displayed.length ? Math.min(displayed[0].hour, end - HOUR) : cutoff;
+    const start = displayed.length
+      ? Math.max(cutoff, Math.min(Math.floor(displayed[0].capturedAt / HOUR) * HOUR, end - HOUR)) : cutoff;
     const width = Math.max(1, plot.clientWidth);
     const chartKey = JSON.stringify([start, end, displayed, width]);
     if (chartKey === lastChartKey) return;
     lastChartKey = chartKey;
     tooltip.hidden = true;
     const right = Math.max(EDGE, width - EDGE);
-    const x = (hour) => EDGE + (hour - start) / (end - start) * (right - EDGE);
+    const x = (timestamp) => EDGE + (timestamp - start) / (end - start) * (right - EDGE);
     const maximum = displayed.reduce((max, item) => Math.max(max, item.count), 0);
     const ceiling = scaleCeiling(maximum);
     const y = (count) => BOTTOM - count / ceiling * (BOTTOM - TOP);
     geometry = { start, end, width, right, x, y };
-    byHour = new Map(displayed.map((item) => [item.hour, item]));
     const content = document.createDocumentFragment();
     const description = displayed.length
-      ? `${displayed.length} samples grouped by hour from ${sampleHourFormat.format(displayed[0].hour)} to ${sampleHourFormat.format(displayed[displayed.length - 1].hour)}. Tooltips show the hour and actual capture time separately. Missing samples are gaps.`
+      ? `${displayed.length} samples plotted at their actual capture times from ${fullFormat.format(displayed[0].capturedAt)} to ${fullFormat.format(displayed[displayed.length - 1].capturedAt)}. Time is Pacific Time. Missing samples are gaps.`
       : "No recorded samples in the last 30 days. Time is Pacific Time. Missing samples are gaps.";
     content.append(svgNode("desc", { id: "chart-description" }, description));
     axis.replaceChildren();
@@ -114,18 +113,20 @@
       axis.append(label);
     }
 
-    const hours = Math.round((end - start) / HOUR);
+    const firstTick = Math.ceil(start / HOUR) * HOUR;
+    const lastTick = Math.floor(end / HOUR) * HOUR;
+    const hours = Math.max(0, Math.round((lastTick - firstTick) / HOUR));
     const tickCount = Math.min(hours + 1, 8, Math.max(2, Math.floor((right - EDGE) / 100) + 1));
     const compactRange = end - start <= 2 * 24 * HOUR;
     const seenDates = new Set();
-    const endDate = dateFormat.format(end);
+    const endDate = dateFormat.format(lastTick);
     for (let index = 0; index < tickCount; index += 1) {
-      const hour = start + Math.round(hours * index / (tickCount - 1)) * HOUR;
+      const hour = firstTick + Math.round(hours * index / Math.max(1, tickCount - 1)) * HOUR;
       const date = dateFormat.format(hour);
       if (!compactRange && (seenDates.has(date) || (date === endDate && index !== tickCount - 1))) continue;
       seenDates.add(date);
       const position = x(hour);
-      const anchor = index === 0 ? "start" : index === tickCount - 1 ? "end" : "middle";
+      const anchor = position - EDGE < 36 ? "start" : right - position < 36 ? "end" : "middle";
       const label = svgNode("text", { x: position, y: 314, "text-anchor": anchor, class: "axis" });
       if (compactRange) {
         label.append(svgNode("tspan", { x: position }, hourFormat.format(hour)));
@@ -145,18 +146,19 @@
     }
     for (const segment of segments) {
       if (segment.length > 1) content.append(svgNode("polyline", {
-        points: segment.map((item) => `${x(item.hour)},${y(item.count)}`).join(" "), class: "trace",
+        points: segment.map((item) => `${x(item.capturedAt)},${y(item.count)}`).join(" "), class: "trace",
       }));
     }
     const radius = displayed.length > 200 ? 1.2 : displayed.length > 12 ? 2 : 3.5;
-    const showValues = displayed.length <= 12 && displayed.every((item, index) => index === 0 || x(item.hour) - x(displayed[index - 1].hour) >= 52);
+    const showValues = displayed.length <= 12 && displayed.every((item, index) => index === 0 || x(item.capturedAt) - x(displayed[index - 1].capturedAt) >= 52);
     for (const item of displayed) {
-      const point = svgNode("circle", { cx: x(item.hour), cy: y(item.count), r: radius, class: "point" });
+      const point = svgNode("circle", { cx: x(item.capturedAt), cy: y(item.count), r: radius, class: "point" });
+      point.setAttribute("data-captured-at", new Date(item.capturedAt).toISOString());
       point.setAttribute("aria-label", sampleDetails(item));
       content.append(point);
       if (showValues) content.append(svgNode("text", {
-        x: x(item.hour), y: y(item.count) - 11,
-        "text-anchor": item.hour === start ? "start" : item.hour === end ? "end" : "middle", class: "value",
+        x: x(item.capturedAt), y: y(item.count) - 11,
+        "text-anchor": x(item.capturedAt) - EDGE < 36 ? "start" : right - x(item.capturedAt) < 36 ? "end" : "middle", class: "value",
       }, numberFormat.format(item.count)));
     }
     svg.setAttribute("width", String(width));
@@ -181,13 +183,23 @@
       tooltip.hidden = true;
       return;
     }
-    const fraction = (position - EDGE) / (geometry.right - EDGE);
-    const hour = Math.round((geometry.start + fraction * (geometry.end - geometry.start)) / HOUR) * HOUR;
-    const item = byHour.get(hour);
+    const hourWidth = (geometry.right - EDGE) * HOUR / (geometry.end - geometry.start);
+    const hitDistance = Math.min(12, Math.max(4, hourWidth / 2));
+    let item = null;
+    let nearestDistance = Infinity;
+    for (const record of displayed) {
+      const dx = geometry.x(record.capturedAt) - position;
+      const dy = geometry.y(record.count) - top;
+      const distance = dx * dx + dy * dy;
+      if (Math.abs(dx) <= hitDistance && Math.abs(dy) <= 12 && distance < nearestDistance) {
+        item = record;
+        nearestDistance = distance;
+      }
+    }
     if (!item) { tooltip.hidden = true; return; }
     tooltip.textContent = sampleDetails(item);
     tooltip.hidden = false;
-    const left = Math.max(0, Math.min(geometry.width - tooltip.offsetWidth, geometry.x(item.hour) - tooltip.offsetWidth / 2));
+    const left = Math.max(0, Math.min(geometry.width - tooltip.offsetWidth, geometry.x(item.capturedAt) - tooltip.offsetWidth / 2));
     tooltip.style.left = `${left}px`;
     tooltip.style.top = `${Math.max(0, geometry.y(item.count) - tooltip.offsetHeight - 12)}px`;
   }
