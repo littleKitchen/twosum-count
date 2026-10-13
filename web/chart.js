@@ -175,7 +175,7 @@
     controller?.abort();
     controller = new AbortController();
     try {
-      const response = await fetch("./data/history.json", {
+      const response = await fetch(`./data/history.json?minute=${Math.floor(Date.now() / 60_000)}`, {
         cache: "no-store", signal: controller.signal,
       });
       if (!response.ok) throw new Error("History unavailable");
