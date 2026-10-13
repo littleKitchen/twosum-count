@@ -9,9 +9,5 @@
   },
   "engines": {
     "node": ">=22"
-  },
-  "dependencies": {
-    "playwright": "^1.64.0",
-    "ws": "^8.18.3"
   }
 }

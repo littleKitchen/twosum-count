@@ -1,5 +1,7 @@
 name: Record Two Sum online count
 on:
+  schedule:
+    - cron: '17 * * * *'
   workflow_dispatch:
 
 concurrency:
@@ -16,20 +18,22 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: main
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '24'
           cache: npm
       - run: npm ci --ignore-scripts --no-audit --no-fund
-      - run: npx playwright install --with-deps chromium
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install the verified source reader
+        run: python -m pip install --disable-pip-version-check 'curl_cffi==0.16.3'
       - run: npm test
       - name: Collect a genuine sample
-        run: xvfb-run --auto-servernum npm run collect
-        env:
-          COLLECT_BROWSER_HEADLESS: '0'
+        run: npm run collect
       - name: Save history
         run: |
           git config user.name "github-actions[bot]"

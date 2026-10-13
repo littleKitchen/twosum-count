@@ -1,10 +1,9 @@
-import WebSocket from "ws";
 import { readFile, writeFile, rename } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { pathToFileURL } from "node:url";
+import { readCountInCurl } from "./curl-read.mjs";
 
 export const SOURCE = "https://leetcode.com/problems/two-sum/";
-export const ENDPOINT = "wss://collaboration-ws.leetcode.com/problems/two-sum";
 export const HISTORY = fileURLToPath(new URL("../web/data/history.json", import.meta.url));
 
 export function validCount(value) {
@@ -14,44 +13,6 @@ export function validCount(value) {
 
 export function hourKey(at) {
   return new Date(Math.floor(new Date(at).getTime() / 3600000) * 3600000).toISOString();
-}
-
-export function readCount({ withTimestamp = false, omitOrigin = false } = {}) {
-  return new Promise((resolve, reject) => {
-    const socket = new WebSocket(ENDPOINT, {
-      ...(omitOrigin ? {} : { origin: "https://leetcode.com" }), handshakeTimeout: 15000,
-      followRedirects: false, maxPayload: 1024,
-      headers: { "User-Agent": "TwoSumHourly/1.0 (+https://github.com/littleKitchen/twosum-count)" },
-    });
-    let finished = false;
-    const timer = setTimeout(() => finish(undefined, new Error("No online count received within 20 seconds")), 20000);
-    function finish(count, error) {
-      if (finished) return;
-      finished = true;
-      clearTimeout(timer);
-      if (socket.readyState === WebSocket.OPEN) socket.close(4000, "Hourly sample received");
-      else socket.terminate();
-      if (error) reject(error);
-      else {
-        const value = validCount(count);
-        resolve(withTimestamp ? { count: value, capturedAt: new Date().toISOString() } : value);
-      }
-    }
-    socket.on("message", (data, binary) => {
-      if (binary) return;
-      const text = data.toString().trim();
-      if (!/^\d+$/.test(text)) return;
-      try { finish(validCount(Number(text))); }
-      catch (error) { finish(undefined, error); }
-    });
-    socket.on("unexpected-response", (_request, response) => {
-      const challenge = response.headers["cf-mitigated"] === "challenge" ? " (Cloudflare security challenge)" : "";
-      response.resume();
-      finish(undefined, new Error(`Source rejected WebSocket handshake: HTTP ${response.statusCode}${challenge}`));
-    });
-    socket.on("error", (error) => finish(undefined, error));
-    socket.on("close", () => finish(undefined, new Error("Source closed before sending an online count")));
-  });
 }
 
 export function appendObservation(history, count, capturedAt) {
@@ -67,17 +28,7 @@ export function appendObservation(history, count, capturedAt) {
 }
 
 export async function readSourceObservation() {
-  if (process.env.COLLECT_PROVIDER === "tinyfish") {
-    const { readCountInTinyFish } = await import("./tinyfish-read.mjs");
-    return readCountInTinyFish({ withTimestamp: true });
-  }
-  try { return await readCount({ withTimestamp: true }); }
-  catch (directError) {
-    console.log("Direct source unavailable; reading the official Online badge in the browser.");
-    const { readCountInBrowser } = await import("./browser-read.mjs");
-    try { return await readCountInBrowser({ withTimestamp: true }); }
-    catch (browserError) { throw new Error(`${directError.message}; ${browserError.message}`); }
-  }
+  return readCountInCurl();
 }
 
 export async function readSourceCount() {
