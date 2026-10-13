@@ -16,10 +16,10 @@ export function hourKey(at) {
   return new Date(Math.floor(new Date(at).getTime() / 3600000) * 3600000).toISOString();
 }
 
-export function readCount({ withTimestamp = false } = {}) {
+export function readCount({ withTimestamp = false, omitOrigin = false } = {}) {
   return new Promise((resolve, reject) => {
     const socket = new WebSocket(ENDPOINT, {
-      origin: "https://leetcode.com", handshakeTimeout: 15000,
+      ...(omitOrigin ? {} : { origin: "https://leetcode.com" }), handshakeTimeout: 15000,
       followRedirects: false, maxPayload: 1024,
       headers: { "User-Agent": "TwoSumHourly/1.0 (+https://github.com/littleKitchen/twosum-count)" },
     });
