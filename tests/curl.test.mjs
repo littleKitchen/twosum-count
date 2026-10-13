@@ -61,7 +61,7 @@ test("extra output, malformed JSON, unexpected fields, and oversized output are 
   assert.deepEqual(parseCurlObservation(`${output()}\n`, now), { count: 713, capturedAt });
 });
 
-test("the adapter uses the fixed Python probe with a bounded process and stdout", async (t) => {
+test("the adapter uses the fixed Python reader with a bounded process and stdout", async (t) => {
   cloud(t);
   let calls = 0;
   const result = await readCountInCurl({
@@ -69,7 +69,7 @@ test("the adapter uses the fixed Python probe with a bounded process and stdout"
     execFileRunner(executable, args, options, callback) {
       calls += 1;
       assert.equal(executable, "python3");
-      assert.deepEqual(args, [fileURLToPath(new URL("../scripts/probe-curl-websocket.py", import.meta.url))]);
+      assert.deepEqual(args, [fileURLToPath(new URL("../scripts/read-online-count.py", import.meta.url))]);
       assert.equal(options.timeout, 40000);
       assert.equal(options.maxBuffer, 4096);
       assert.equal(options.killSignal, "SIGKILL");

@@ -1,5 +1,6 @@
 {
   "name": "twosum-count",
+  "description": "Hourly LeetCode Two Sum online counts displayed in Pacific Time.",
   "version": "1.0.0",
   "private": true,
   "type": "module",

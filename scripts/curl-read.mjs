@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 export const CURL_SOURCE = "https://leetcode.com/problems/two-sum/description/";
-const PROBE = fileURLToPath(new URL("./probe-curl-websocket.py", import.meta.url));
+const READER = fileURLToPath(new URL("./read-online-count.py", import.meta.url));
 const MAX_OUTPUT_BYTES = 4096;
 const UTC_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 
@@ -43,12 +43,12 @@ export function parseCurlObservation(stdout, now = new Date()) {
 
 export async function readCountInCurl({ execFileRunner = execFile, clock = () => new Date() } = {}) {
   // This guard is independent of dependency injection. The normal runtime
-  // never calls the cloud probe from a developer's local machine.
+  // never calls the source reader from a developer's local machine.
   if (process.env.GITHUB_ACTIONS !== "true") throw failure("CloudOnly");
 
   return new Promise((resolve, reject) => {
     try {
-      execFileRunner("python3", [PROBE], {
+      execFileRunner("python3", [READER], {
         timeout: 40000,
         killSignal: "SIGKILL",
         maxBuffer: MAX_OUTPUT_BYTES,

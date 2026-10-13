@@ -1,6 +1,5 @@
 import { readFile, writeFile, rename } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { readCountInCurl } from "./curl-read.mjs";
 
 export const SOURCE = "https://leetcode.com/problems/two-sum/";
@@ -29,10 +28,6 @@ export function appendObservation(history, count, capturedAt) {
 
 export async function readSourceObservation() {
   return readCountInCurl();
-}
-
-export async function readSourceCount() {
-  return validCount((await readSourceObservation()).count);
 }
 
 export function validateObservation(value, now) {

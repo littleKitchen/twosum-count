@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""One cloud-only interoperability probe of LeetCode's public counter.
+"""Read one fresh LeetCode Two Sum online count in GitHub Actions.
 
 The documented curl_cffi `impersonate="chrome"` option selects its
 Chrome-compatible TLS transport. Browser identity headers are disabled; the
@@ -66,7 +66,7 @@ def safe_failure(error):
     return result
 
 
-async def probe():
+async def read_count():
     if os.environ.get("GITHUB_ACTIONS") != "true":
         raise RuntimeError("CloudOnly")
 
@@ -127,7 +127,7 @@ def main():
         print(json.dumps({"error": "CloudOnly"}))
         return 1
     try:
-        result = asyncio.run(probe())
+        result = asyncio.run(read_count())
     except Exception as error:
         print(json.dumps(safe_failure(error), separators=(",", ":")))
         return 1

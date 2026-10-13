@@ -30,7 +30,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install the verified source reader
-        run: python -m pip install --disable-pip-version-check 'curl_cffi==0.16.3'
+        run: python -m pip install --disable-pip-version-check --requirement requirements.txt
       - run: npm test
       - name: Collect a genuine sample
         run: npm run collect
