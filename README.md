@@ -12,4 +12,6 @@
 
 项目要求完全在云端每小时自动采集。GitHub Actions 的 Linux 云端采集实测受到 LeetCode 的安全验证拦截，尚未启用每小时定时任务，本机自动任务保持关闭。云端采集验证通过前，页面仅展示已保存的真实历史。`hourly.yml` 和 `source-probe.yml` 用于手动验证。
 
+2026-10-13 的真实云端验证均未获得人数：Linux、Windows、macOS 的普通 Chromium，以及 macOS 正式 Google Chrome 均返回 HTTP 403 / Cloudflare 安全验证。验证直接请求新的源数据，不会因为本小时已经保存过记录而跳过。可查看 [Linux 验证](https://github.com/littleKitchen/twosum-count/actions/runs/38449893722)、[Windows 验证](https://github.com/littleKitchen/twosum-count/actions/runs/38452214570/job/115485730046)、[macOS Chromium 验证](https://github.com/littleKitchen/twosum-count/actions/runs/38452973392)、[Google Chrome 验证](https://github.com/littleKitchen/twosum-count/actions/runs/38453348029)。自动采集尚未打通，项目目前未满足完整需求。
+
 每次推送后，`pages.yml` 将 `web/` 发布到 GitHub Pages。网页会自动检查更新；显示的每个点对应该小时实际成功采集的第一次人数，鼠标停在点上可查看实际采集时间。时区采用 `America/Los_Angeles`，自动处理夏令时。
