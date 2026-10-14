@@ -8,7 +8,7 @@ GitHub Actions collects the counts and GitHub Pages hosts the website. Collectio
 
 ## How it works
 
-1. GitHub Actions is scheduled to open a fresh connection to LeetCode's public Two Sum counter at `wss://collaboration-ws.leetcode.com/problems/two-sum` every hour at minute **37**.
+1. GitHub Actions is scheduled to open a fresh connection to LeetCode's public Two Sum counter at `wss://collaboration-ws.leetcode.com/problems/two-sum` every hour at minute **17**.
 2. The collector accepts a numeric text message and records the count together with the time it was received.
 3. The first successful sample for that hour is saved in [`web/data/history.json`](web/data/history.json). The same workflow publishes the updated chart to GitHub Pages.
 4. The page checks for newly published data every minute. One responsive chart fits the most recent **30 days** on screen without horizontal scrolling; before a full month has accumulated, it shows the available history. Hover or tap the chart to see a sample's count and actual collection time.
