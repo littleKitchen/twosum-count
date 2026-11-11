@@ -1,6 +1,6 @@
 {
   "source": "https://leetcode.com/problems/two-sum/",
-  "updatedAt": "2026-11-11T06:25:58.703Z",
+  "updatedAt": "2026-11-11T08:00:34.252Z",
   "observations": [
     {
       "hour": "2026-10-13T18:00:00.000Z",
@@ -2948,6 +2948,11 @@
       "hour": "2026-11-11T06:00:00.000Z",
       "capturedAt": "2026-11-11T06:25:58.703Z",
       "count": 800
+    },
+    {
+      "hour": "2026-11-11T08:00:00.000Z",
+      "capturedAt": "2026-11-11T08:00:34.252Z",
+      "count": 835
     }
   ]
 }
